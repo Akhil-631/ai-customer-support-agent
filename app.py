@@ -1,14 +1,19 @@
 import streamlit as st
+import uuid
+import requests
 
-from agent import (
-    classify_intent,
-    route_intent
-)
 
 st.set_page_config(
     page_title="Enterprise AI Customer Support Agent",
     page_icon="🤖",
     layout="wide"
+)
+
+if "conversation_id" not in st.session_state:
+    st.session_state["conversation_id"] = str(uuid.uuid4())
+
+st.sidebar.caption(
+    f"Conversation ID: {st.session_state['conversation_id']}"
 )
 
 st.info(
@@ -56,96 +61,201 @@ if st.button("Submit"):
 
         with st.spinner("🤖 AI Agent is analyzing your request..."):
 
-            result = classify_intent(user_query)
-
-            response = route_intent(
-                result,
-                user_query
+            response = requests.post(
+                "http://127.0.0.1:8000/chat",
+                json={
+                    "message": user_query,
+                    "conversation_id": st.session_state["conversation_id"]
+                }
             )
+
+            response.raise_for_status()
+
+            result = response.json()
+
+            st.session_state["result"] = result
+
+        st.rerun()
 
         st.divider()
 
-        st.subheader("🧠 Agent Response")
+if "result" in st.session_state:
 
-        col1, col2, col3, col4 = st.columns(4)
+    result = st.session_state["result"]
 
-        with col1:
-            intent_display = {
-                "order_status": "📦 Order Status",
-                "delivery_status": "🚚 Delivery Status",
-                "refund_status": "💰 Refund Status",
-                "cancel_order": "❌ Cancel Order",
-                "human_support": "👨‍💼 Human Support"
-            }
+    # --------------------------------
+    # Human Review
+    # --------------------------------
 
-            st.metric(
-                "Intent",
-                intent_display.get(
-                    result["intent"],
-                    result["intent"]
+    if result.get("human_review_required", False):
+
+        st.warning(
+            "⚠️ Human Review Required"
+        )
+
+        review_data = result.get(
+            "human_review_data"
+        )
+
+        if review_data:
+
+            st.write(
+                "**Customer Query:**",
+                review_data.get(
+                    "user_query",
+                    "-"
                 )
-)
-
-        with col2:
-            st.metric(
-                "Confidence",
-                f"{result['confidence']*100:.0f}%"
-)
-
-        with col3:
-            st.metric(
-                "Requires Human",
-                "Yes" if result["requires_human"] else "No"
             )
 
-        with col4:
-            tool_map = {
-                "order_status": "📦 Get Order Status",
-                "delivery_status": "🚚 Get Delivery Status",
-                "refund_status": "💰 Get Refund Status",
-                "cancel_order": "❌ Cancel Order",
-                "human_support": "👨‍💼 Create Support Ticket"
-            }
+            st.write(
+                "**Intent:**",
+                review_data.get(
+                    "intent",
+                    "-"
+                )
+            )
 
-            st.metric(
-                "Tool Selected",
-                tool_map.get(
-                    result["intent"],
+            st.write(
+                "**Order ID:**",
+                review_data.get(
+                    "order_id",
                     "-"
                 )
             )
 
         st.divider()
 
-        if result["intent"] == "order_status":
+        st.subheader(
+            "👨‍💼 Human Decision"
+        )
 
-            lines = response.split("\n")
+        col1, col2, col3 = st.columns(3)
 
-            col1, col2, col3 = st.columns(3)
+        with col1:
 
-            with col1:
-                st.metric("📦 Order Status", lines[0].replace("Order Status: ", ""))
+            approve = st.button(
+                "✅ Approve & Execute",
+                use_container_width=True
+            )
 
-            with col2:
-                st.metric("🚚 Delivery", lines[1].replace("Delivery Status: ", ""))
+        with col2:
 
-            with col3:
-                st.metric("📅 Expected", lines[2].replace("Expected Delivery: ", ""))
+            reject = st.button(
+                "❌ Reject",
+                use_container_width=True
+            )
 
+        with col3:
 
-        else:
-            if result["intent"] == "human_support":
-                st.warning(response)
+            escalate = st.button(
+                "👨‍💼 Escalate",
+                use_container_width=True
+            )
 
-            elif result["intent"] == "cancel_order":
-                st.success(response)
+        decision = None
 
-            elif result["intent"] == "refund_status":
-                st.info(response)
+        if approve:
+            decision = "approve"
 
-            else:
-                st.success(response)
+        elif reject:
+            decision = "reject"
 
+        elif escalate:
+            decision = "escalate"
+
+        if decision:
+
+            with st.spinner(
+                "Processing human decision..."
+            ):
+
+                review_response = requests.post(
+                    "http://127.0.0.1:8000/human-review",
+                    json={
+                        "conversation_id":
+                            st.session_state[
+                                "conversation_id"
+                            ],
+                        "decision": decision
+                    }
+                )
+
+                review_response.raise_for_status()
+
+                result = review_response.json()
+
+                st.session_state["result"] = result
+
+            st.rerun()
+
+    st.subheader("🧠 Agent Response")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+
+        intent_display = {
+            "order_status": "📦 Order Status",
+            "delivery_status": "🚚 Delivery Status",
+            "refund_status": "💰 Refund Status",
+            "cancel_order": "❌ Cancel Order",
+            "human_support": "👨‍💼 Human Support"
+        }
+
+        st.metric(
+            "Intent",
+            intent_display.get(
+                result["intent"],
+                result["intent"]
+            )
+        )
+
+    with col2:
+
+        st.metric(
+            "Confidence",
+            f"{result['confidence'] * 100:.0f}%"
+        )
+
+    with col3:
+
+        st.metric(
+            "Requires Human",
+            "Yes" if result["requires_human"] else "No"
+        )
+
+    with col4:
+
+        tool_map = {
+            "order_status": "📦 Get Order Status",
+            "delivery_status": "🚚 Get Delivery Status",
+            "refund_status": "💰 Get Refund Status",
+            "cancel_order": "❌ Cancel Order",
+            "human_support": "👨‍💼 Create Support Ticket"
+        }
+
+        st.metric(
+            "Tool Selected",
+            tool_map.get(
+                result["intent"],
+                "-"
+            )
+        )
+
+    st.divider()
+
+    # --------------------------------
+    # Final Agent Response
+    # --------------------------------
+
+    st.subheader("💬 Customer Response")
+
+    st.write(
+        result.get(
+            "response",
+            "I was unable to generate a response."
+        )
+    )
 st.divider()
 
 st.caption(

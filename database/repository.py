@@ -40,6 +40,41 @@ def get_order(order_id):
         "expected_delivery": str(result.expected_delivery)
     }
 
+def get_order_lines(order_id):
+
+    query = text("""
+        SELECT
+            order_id,
+            product_name,
+            order_status,
+            delivery_status,
+            expected_delivery
+        FROM orders
+        WHERE order_id = :order_id
+        ORDER BY id;
+    """)
+
+    with engine.connect() as connection:
+
+        results = connection.execute(
+            query,
+            {"order_id": order_id}
+        ).fetchall()
+
+    if not results:
+        return None
+
+    return [
+        {
+            "order_id": row.order_id,
+            "product_name": row.product_name,
+            "order_status": row.order_status,
+            "delivery_status": row.delivery_status,
+            "expected_delivery": str(row.expected_delivery)
+        }
+        for row in results
+    ]
+
 def cancel_order(order_id):
 
     query = text("""

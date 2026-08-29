@@ -1,4 +1,6 @@
 import os
+import time
+
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -12,22 +14,45 @@ client=OpenAI(
 
 def call_llm(system_message, user_message):
 
-    response = client.chat.completions.create(
+    max_attempts = 3
 
-        model="openai/gpt-oss-20b",
+    for attempt in range(1, max_attempts + 1):
 
-        messages=[
-            {
-                "role": "system",
-                "content": system_message
-            },
-            {
-                "role": "user",
-                "content": user_message
-            }
-        ],
+        try:
 
-        temperature=0.0,
-    )
+            response = client.chat.completions.create(
 
-    return response.choices[0].message.content.strip()
+                model="openai/gpt-oss-20b",
+
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_message
+                    },
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ],
+
+                temperature=0.0,
+            )
+
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+
+            print(
+                f"\nLLM API attempt "
+                f"{attempt}/{max_attempts} failed"
+            )
+
+            print(e)
+
+            if attempt == max_attempts:
+
+                raise
+            
+            time.sleep(1)
+            
+                
