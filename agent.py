@@ -28,6 +28,7 @@ class Intent(str, Enum):
     CANCEL_ORDER = "cancel_order"
     HUMAN_SUPPORT = "human_support"
     GENERAL_QUERY = "general_query"
+    CONVERSATIONAL = "conversational"
 
 # -------------------------------
 # LLM Response Schema

@@ -3,7 +3,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
 from llm_client import call_llm
 from prompts import (
-    RESPONSE_GENERATION_PROMPT
+    RESPONSE_GENERATION_PROMPT,
+    CONVERSATIONAL_RESPONSE_PROMPT
 )
 from rag_pipeline import ask_rag
 from typing import TypedDict
@@ -51,7 +52,9 @@ def classify_node(state: AgentState):
     result = classify_intent(state.user_query)
 
     state.intent = result.get("intent")
-    state.order_id = result.get("order_id")
+    new_order_id = result.get("order_id")
+    if new_order_id:
+        state.order_id = new_order_id
     state.confidence = result.get("confidence", 0.0)
     state.requires_human = result.get("requires_human", False)
 
@@ -246,11 +249,14 @@ def route_after_human_review(state: AgentState):
     
 def route_after_classification(state: AgentState):
 
-    if state.requires_human and state.intent != "human_support":
-        return "human_review"
-
     if state.intent == "general_query":
         return "rag"
+
+    if state.intent == "conversational":
+        return "conversational"
+
+    if state.requires_human and state.intent != "human_support":
+        return "human_review"
 
     return "validate"
 
@@ -351,11 +357,27 @@ def execute_approved_cancel_node(state: AgentState):
 
     return state
 
+def conversational_node(state: AgentState):
+
+    response = call_llm(
+        CONVERSATIONAL_RESPONSE_PROMPT,
+        state.user_query
+    )
+
+    state.final_response = response
+
+    return state
+
 graph_builder = StateGraph(AgentState)
 
 graph_builder.add_node(
     "classify_intent",
     classify_node
+)
+
+graph_builder.add_node(
+    "conversational",
+    conversational_node
 )
 
 graph_builder.add_node(
@@ -449,7 +471,8 @@ graph_builder.add_conditional_edges(
     {
         "validate": "validate_request",
         "human_review": "human_review",
-        "rag": "rag"
+        "rag": "rag",
+        "conversational": "conversational"
     }
 )
 
@@ -549,6 +572,11 @@ graph_builder.add_edge(
 
 graph_builder.add_edge(
     "rag",
+    END
+)
+
+graph_builder.add_edge(
+    "conversational",
     END
 )
 

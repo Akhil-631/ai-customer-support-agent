@@ -10,10 +10,6 @@ def generate_grounded_response(
     Generate an answer using only retrieved context.
     """
 
-    if not context or not context.strip():
-
-        return "I don't know"
-
     prompt = GROUNDED_GENERATION_PROMPT.format(
         context=context,
         query=query

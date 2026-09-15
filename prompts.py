@@ -55,6 +55,14 @@ Available intents:
 - General questions that can be answered from the company's knowledge base.
 - Questions that do not require checking a specific order or business record.
 
+7. conversational
+- Greetings such as hello, hi, hey, good morning, good afternoon.
+- Casual conversation that does not require company knowledge.
+- Acknowledgements such as okay, alright, got it.
+- Thank-you messages.
+- Farewells such as bye, goodbye.
+- Simple conversational messages that do not require checking company information or business records.
+
 Rules:
 
 - If the customer asks about cancelling an order,
@@ -84,6 +92,46 @@ Rules:
 
 - If the customer asks about an existing refund for a specific order,
   intent = refund_status
+
+- If the customer is simply greeting the assistant,
+  intent = conversational
+
+- If the customer is thanking the assistant,
+  intent = conversational
+
+- If the customer is saying goodbye,
+  intent = conversational
+
+- If the customer is making casual conversation that does not
+  require company knowledge,
+  intent = conversational
+
+- If a message contains both a greeting and a substantive
+  customer support question, classify the substantive question
+  rather than conversational.
+
+- If the customer is simply greeting, thanking, acknowledging,
+  saying goodbye, or engaging in basic conversation,
+  intent = conversational
+
+- Conversational messages do not require RAG or a business tool.
+
+- Do not classify a conversational message as general_query
+  merely because it is not related to an order.
+
+- general_query should be used when the customer is asking
+  for information that can be answered using the company's
+  knowledge base.
+
+Examples:
+"Hello, what is your return policy?"
+→ general_query
+
+"Hi, where is my order CA-2017-152156?"
+→ delivery_status
+
+"Hey, I need to cancel my order CA-2017-152156."
+→ cancel_order
 
 Confidence rules:
 
@@ -197,6 +245,84 @@ Output:
   "requires_human":false
 }
 
+----------------------------
+
+User:
+"Hello"
+
+Output:
+{
+  "intent":"conversational",
+  "order_id":null,
+  "confidence":0.99,
+  "requires_human":false
+}
+
+----------------------------
+
+User:
+"Hi, how are you?"
+
+Output:
+{
+  "intent":"conversational",
+  "order_id":null,
+  "confidence":0.99,
+  "requires_human":false
+}
+
+----------------------------
+
+User:
+"Thanks"
+
+Output:
+{
+  "intent":"conversational",
+  "order_id":null,
+  "confidence":0.99,
+  "requires_human":false
+}
+
+----------------------------
+
+User:
+"Okay, got it"
+
+Output:
+{
+  "intent":"conversational",
+  "order_id":null,
+  "confidence":0.99,
+  "requires_human":false
+}
+
+----------------------------
+
+User:
+"Goodbye"
+
+Output:
+{
+  "intent":"conversational",
+  "order_id":null,
+  "confidence":0.99,
+  "requires_human":false
+}
+
+----------------------------
+
+User:
+"What is your return policy?"
+
+Output:
+{
+  "intent":"general_query",
+  "order_id":null,
+  "confidence":0.98,
+  "requires_human":false
+}
+
 User Query:
 
 """
@@ -272,4 +398,24 @@ Rules:
 - intent must be one of the allowed intent values.
 
 Original customer query:
+"""
+
+CONVERSATIONAL_RESPONSE_PROMPT = """
+You are the conversational layer of an AI customer support assistant.
+
+Respond naturally and politely to simple conversational messages.
+
+The user message may be:
+- a greeting
+- a thank-you
+- an acknowledgement
+- a farewell
+- simple casual conversation
+
+Do not provide company policies, order information,
+refund information, or business actions here.
+
+Keep the response concise and friendly.
+
+User message:
 """
