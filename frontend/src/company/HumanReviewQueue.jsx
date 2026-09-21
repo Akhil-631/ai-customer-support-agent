@@ -1,7 +1,7 @@
 import { DatabaseZap, Info } from 'lucide-react'
 import ReviewRequestCard from './ReviewRequestCard'
 
-export default function HumanReviewQueue({ requests }) {
+export default function HumanReviewQueue({ requests, onReviewProcessed }) {
   return (
     <section className="company-page-content">
       <div className="company-notice" role="status">
@@ -22,7 +22,7 @@ export default function HumanReviewQueue({ requests }) {
       </div>
 
       <div className="review-list">
-        {requests.map((request) => <ReviewRequestCard key={request.id} request={request} />)}
+        {requests.map((request) => <ReviewRequestCard key={request.id} request={request} onReviewProcessed={onReviewProcessed} />)}
       </div>
     </section>
   )

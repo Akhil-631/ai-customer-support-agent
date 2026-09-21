@@ -101,8 +101,28 @@ export const Thread = ({
   );
 };
 
-const HumanReviewCard = ({ data }) => {
-  if (!data) return null
+const HumanReviewCard = ({ data, result }) => {
+  if (!data && !result) return null
+
+  if (result) {
+    return (
+      <div className="mx-auto mb-4 w-full max-w-[44rem] rounded-xl border border-green-200 bg-green-50 p-4">
+        <div className="mb-2">
+          <h3 className="text-sm font-semibold text-green-900">
+            Human review completed
+          </h3>
+
+          <p className="mt-1 text-xs leading-relaxed text-green-800">
+            Your request has been reviewed by a support representative.
+          </p>
+        </div>
+
+        <p className="text-sm leading-relaxed text-green-950">
+          {result}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto mb-4 w-full max-w-[44rem] rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -154,7 +174,7 @@ const ThreadRoot = ({
   isEmpty,
   autoFocus,
 }) => {
-  const humanReview = useHumanReview();
+  const { data: humanReview, result: humanReviewResult } = useHumanReview();
   const { Welcome = ThreadWelcome } = useContext(ThreadComponentsContext);
 
   return (
@@ -188,7 +208,8 @@ const ThreadRoot = ({
             {() => <ThreadMessage />}
           </ThreadPrimitive.Messages>
 
-          <HumanReviewCard data={humanReview} />
+          <HumanReviewCard data={humanReview}
+            result={humanReviewResult} />
         </div>
 
         <ThreadPrimitive.ViewportFooter

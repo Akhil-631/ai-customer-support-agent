@@ -155,3 +155,126 @@ def create_support_ticket(order_id, issue):
         ).fetchone()
 
     return ticket.ticket_id
+
+def create_human_review(
+    conversation_id,
+    order_id,
+    request_type,
+    issue
+):
+
+    query = text("""
+        INSERT INTO human_review_requests
+        (
+            conversation_id,
+            order_id,
+            request_type,
+            issue,
+            status
+        )
+        VALUES
+        (
+            :conversation_id,
+            :order_id,
+            :request_type,
+            :issue,
+            'Pending'
+        )
+        RETURNING review_id;
+    """)
+
+    with engine.begin() as connection:
+
+        review = connection.execute(
+            query,
+            {
+                "conversation_id": conversation_id,
+                "order_id": order_id,
+                "request_type": request_type,
+                "issue": issue
+            }
+        ).fetchone()
+
+    return review.review_id
+
+
+def get_pending_human_reviews():
+
+    query = text("""
+        SELECT
+            review_id,
+            conversation_id,
+            order_id,
+            request_type,
+            issue,
+            status,
+            created_at,
+            updated_at
+        FROM human_review_requests
+        WHERE status = 'Pending'
+        ORDER BY created_at ASC;
+    """)
+
+    with engine.connect() as connection:
+
+        results = connection.execute(query).fetchall()
+
+    return [
+        {
+            "review_id": row.review_id,
+            "conversation_id": row.conversation_id,
+            "order_id": row.order_id,
+            "request_type": row.request_type,
+            "issue": row.issue,
+            "status": row.status,
+            "created_at": str(row.created_at),
+            "updated_at": str(row.updated_at)
+        }
+        for row in results
+    ]
+
+
+def update_human_review(review_id, status):
+
+    query = text("""
+        UPDATE human_review_requests
+        SET
+            status = :status,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE review_id = :review_id;
+    """)
+
+    with engine.begin() as connection:
+
+        result = connection.execute(
+            query,
+            {
+                "review_id": review_id,
+                "status": status
+            }
+        )
+
+    return result.rowcount
+
+def update_human_review_by_conversation(conversation_id, status):
+
+    query = text("""
+        UPDATE human_review_requests
+        SET
+            status = :status,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE conversation_id = :conversation_id
+          AND status = 'Pending';
+    """)
+
+    with engine.begin() as connection:
+
+        result = connection.execute(
+            query,
+            {
+                "conversation_id": conversation_id,
+                "status": status
+            }
+        )
+
+    return result.rowcount

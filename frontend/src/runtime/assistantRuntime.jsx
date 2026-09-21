@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { sendChatMessage } from '@/api/chatApi'
+import { getConversationState, sendChatMessage } from '@/api/chatApi'
 
 const HumanReviewContext = createContext(null)
 
@@ -42,7 +42,30 @@ export function AssistantRuntime({ children }) {
   const conversationIdRef = useRef(crypto.randomUUID())
   const conversationIdsByThreadRef = useRef(new Map())
   const [humanReview, setHumanReview] = useState(null)
+  const [humanReviewResult, setHumanReviewResult] = useState(null)
   const clearHumanReview = useCallback(() => setHumanReview(null), [])
+
+  useEffect(() => {
+  if (!humanReview) return
+
+  const interval = setInterval(async () => {
+    try {
+      const state = await getConversationState(
+        conversationIdRef.current,
+      )
+
+      if (!state.human_review_required && state.human_decision && state.final_response) {
+        setHumanReviewResult(state.final_response)
+        setHumanReview(null)
+        clearInterval(interval)
+      }
+    } catch (error) {
+      console.error('Failed to check human review state:', error)
+    }
+  }, 2000)
+
+  return () => clearInterval(interval)
+}, [humanReview])
 
   const chatModel = {
     async run({ messages }) {
@@ -81,7 +104,7 @@ export function AssistantRuntime({ children }) {
   const runtime = useLocalRuntime(chatModel)
 
   return (
-    <HumanReviewContext.Provider value={humanReview}>
+    <HumanReviewContext.Provider value={{data:humanReview, result:humanReviewResult}}>
       <AssistantRuntimeProvider runtime={runtime}>
         <ConversationIdSynchronizer
           conversationIdRef={conversationIdRef}

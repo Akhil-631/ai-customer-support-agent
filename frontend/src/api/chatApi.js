@@ -40,3 +40,17 @@ export async function sendHumanReviewDecision(
 
   return response.json()
 }
+
+export async function getConversationState(conversationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/conversation/${conversationId}`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Conversation state request failed: ${response.status}`,
+    )
+  }
+
+  return response.json()
+}

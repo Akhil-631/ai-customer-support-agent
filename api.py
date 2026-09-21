@@ -5,6 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from graph import graph
 from state import AgentState
 from rag_setup import initialize_rag
+from database.repository import (
+    create_human_review,
+    get_pending_human_reviews,
+    update_human_review_by_conversation
+)
 
 from schemas import (
     ChatRequest,
@@ -83,6 +88,26 @@ def chat(request: ChatRequest):
 
             human_review_data = interrupts[0].value
 
+        # Persist human review request
+            if human_review_data:
+
+                review_id = create_human_review(
+                    conversation_id=request.conversation_id,
+                    order_id=result.get("order_id"),
+                    request_type=human_review_data.get(
+                        "request_type",
+                        "Human Support"
+                    ),
+                    issue=human_review_data.get(
+                        "issue",
+                        request.message
+                    )
+                )
+
+                print(
+                    f"Human review request created: {review_id}"
+                )
+
         return ChatResponse(
             response="Human review is required for this request.",
             intent=result.get("intent"),
@@ -105,6 +130,48 @@ def chat(request: ChatRequest):
         human_review_required=False,
         human_review_data=None
     )
+
+@app.get("/human-reviews")
+def get_human_reviews():
+
+    reviews = get_pending_human_reviews()
+
+    return {
+        "reviews": reviews
+    }
+
+@app.get("/conversation/{conversation_id}")
+def get_conversation_state(conversation_id: str):
+
+    config = {
+        "configurable": {
+            "thread_id": conversation_id
+        }
+    }
+
+    snapshot = graph.get_state(config)
+
+    values = snapshot.values
+
+    return {
+        "requires_human": values.get(
+            "requires_human",
+            False
+        ),
+        "human_review_required": values.get(
+            "human_review_required",
+            False
+        ),
+        "human_decision": values.get(
+            "human_decision"
+        ),
+        "final_response": values.get(
+            "final_response"
+        ),
+        "next_action": values.get(
+            "next_action"
+        )
+    }
 
 @app.post(
     "/human-review",
@@ -144,6 +211,22 @@ def human_review(request: HumanReviewRequest):
         }
     )
 
+    review_status = {
+        "approve": "Approved",
+        "reject": "Rejected",
+        "escalate": "Escalated"
+    }[decision]
+
+    updated_reviews = update_human_review_by_conversation(
+        request.conversation_id,
+        review_status
+    )
+
+    print(
+        f"Human review status updated: "
+        f"{review_status} ({updated_reviews} record(s))"
+    )
+
     print("\n============ HUMAN REVIEW RESULT ============")
     print(result)
     print("=============================================\n")
@@ -181,3 +264,4 @@ def human_review(request: HumanReviewRequest):
         human_review_required=False,
         human_review_data=None
     )
+
